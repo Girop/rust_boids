@@ -3,14 +3,6 @@
 version = 3
 
 [[package]]
-name = "Boids"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "rand",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -814,6 +806,14 @@ name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
+
+[[package]]
+name = "boids"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "rand",
+]
 
 [[package]]
 name = "bumpalo"
