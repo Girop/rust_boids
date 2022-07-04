@@ -4,7 +4,6 @@ use rand::Rng;
 use crate::components::Velocity;
 
 const BOID_SPRITE: &str = "boid.png";
-
 pub struct BoidPlugin;
 
 impl Plugin for BoidPlugin {
@@ -36,14 +35,49 @@ fn spawn_boid(mut commands: Commands, assets_server: Res<AssetServer>, windows: 
                 ..Default::default()
             })
             .insert(Boid)
-            .insert(Velocity { x: 1.0, y: 1.0 });
+            .insert(Velocity { x: 0.0, y: 0.0 });
     }
 }
 
-fn boid_movement_system(mut query: Query<(&Velocity, &mut Transform), With<Boid>>) {
-    for (velocity, mut transform) in query.iter_mut() {
-        let translation = &mut transform.translation;
-        translation.x += velocity.x;
-        translation.y += velocity.y;
+struct Acceleration {
+    x: f32,
+    y: f32,
+}
+
+struct BoidDataWrapper {
+    postion: (f32, f32),
+    velocity: (f32, f32),
+}
+
+impl BoidDataWrapper{
+    fn from(pos: (f32,f32),vel:(f32,f32)) -> Self{
+        BoidDataWrapper { postion: pos, velocity: vel }
+    }
+}
+
+fn separation() {}
+
+fn aligment() {}
+
+fn cohesion() {}
+
+fn boid_movement_system(mut boids_query: Query<(&mut Velocity, &mut Transform), With<Boid>>) {
+    let mut population: Vec<BoidDataWrapper> = Vec::new();
+    for (mut velocity_iter, mut transform) in boids_query.iter_mut() {
+        let translation = &transform.translation;
+        let position = (translation.x,translation.y);
+        let velocity = (velocity_iter.x,velocity_iter.y);
+
+        let boid_data = BoidDataWrapper::from(position, velocity);
+        population.push(boid_data);
+    }
+
+    for (index,data) in population.iter_mut().enumerate(){
+        let (position,velocity) = (data.postion,data.velocity);
+
+
+
+        position.0 += velocity.0;
+        position.1 += velocity.1;
     }
 }
