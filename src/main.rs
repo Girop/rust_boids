@@ -1,4 +1,4 @@
-#[allow(unused)]
+#![allow(unused)]
 use bevy::prelude::*;
 use boid::BoidPlugin;
 
