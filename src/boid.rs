@@ -1,5 +1,5 @@
 #![allow(unused)]
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -46,10 +46,14 @@ fn spawn_boid(mut commands: Commands, assets_server: Res<AssetServer>, windows: 
     }
 }
 
-fn separation(nearby: Vec<(f32, f32)>) -> Vec2 {
+fn separation(nearby: Vec<(f32, f32)>, this_pos: (f32, f32)) -> Vec2 {
     let mut separation_vec = Vec2::from((0.0, 0.0));
 
-    for (x_nearby, y_nearby) in nearby {}
+    for (x_nearby, y_nearby) in nearby {
+        let reverse_vec = Vec2::from((this_pos.0 - x_nearby, this_pos.1 - y_nearby));
+        separation_vec += reverse_vec;
+    }
+    separation_vec.normalize();
 
     separation_vec
 }
@@ -62,12 +66,18 @@ fn aligment(nearby: Vec<(f32, f32)>) -> Vec2 {
         aligment_vec[1] += nearby_y;
     }
 
+    aligment_vec.normalize();
+
     aligment_vec
 }
 
-fn cohesion(nearby: Vec<(f32, f32)>) -> Vec2 {
-    let mut cohesion_vec = Vec2::from((0.0, 0.0));
-
+fn cohesion(nearby: Vec<(f32, f32)>,this_pos: (f32, f32)) -> Vec2 {
+    let mut cohesion_vec = Vec2::from((0.0, 0.0)); 
+    for nearby_position in nearby{
+        cohesion_vec.add(Vec2::from(nearby_position));
+    }
+    
+    cohesion_vec.mul(1.0/(nearby.len() as f32));
     cohesion_vec
 }
 
