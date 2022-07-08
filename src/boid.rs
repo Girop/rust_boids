@@ -5,10 +5,11 @@ use crate::components::Velocity;
 
 const BOID_SPRITE: &str = "boid.png";
 const VIEW_DISTANCE: f32 = 125.0;
+const BOID_POPULATION: i32 = 50;
 
 const SEPARATION_FORCE: f32 = 0.02;
 const COHESION_FORCE: f32 = 0.32;
-const ALIGMENT_FORCE: f32 = 0.16;
+const ALIGMENT_FORCE: f32 = 0.3;
 
 pub struct BoidPlugin;
 
@@ -30,9 +31,9 @@ fn spawn_boid(mut commands: Commands, assets_server: Res<AssetServer>, windows: 
     let window = windows.get_primary().unwrap();
     let (width, height) = (window.width(), window.height());
 
-    for _ in 0..=50 {
-        let pos_x = rng.gen_range(-width..width);
-        let pos_y = rng.gen_range(-height..height);
+    for _ in 0..BOID_POPULATION {
+        let pos_x = rng.gen_range(-width / 2.0..width / 2.0);
+        let pos_y = rng.gen_range(-height / 2.0..height / 2.0);
         commands
             .spawn_bundle(SpriteBundle {
                 texture: assets_server.load(BOID_SPRITE),
@@ -71,11 +72,11 @@ fn separation(nearby: &Vec<(f32, f32)>, this_pos: (&f32, &f32)) -> Vec2 {
 fn aligment(nearby_velocity: &Vec<(f32, f32)>, current_velocity: &(f32, f32)) -> Vec2 {
     let mut aligment_vec = Vec2::new(0.0, 0.0);
 
-    for velocity in nearby_velocity.iter(){
+    for velocity in nearby_velocity.iter() {
         aligment_vec += Vec2::from(*velocity);
     }
     aligment_vec += Vec2::from(*current_velocity);
-     
+
     normalize(aligment_vec) * ALIGMENT_FORCE
 }
 
@@ -101,32 +102,37 @@ fn boid_initialize_velocity(mut boids_query: Query<&mut Velocity, With<Boid>>) {
     }
 }
 
-fn calculate_acceleration(
-    mut boids_query: Query<(&mut Velocity, &Transform), With<Boid>>
-) { 
-    // I need to somwhow copy query to iterate simultaneously over them / seems imposible this way
+fn calculate_acceleration(mut boids_query: Query<(&mut Velocity, &Transform), With<Boid>>) {
+    let mut other_boids: Vec<((f32, f32), (f32, f32))> = Vec::new();
+    for (vel, transform) in boids_query.iter() {
+        let x = transform.translation.x.clone();
+        let y = transform.translation.y.clone();
+
+        let x_vel = vel.x.clone();
+        let y_vel = vel.y.clone();
+
+        other_boids.push(((x, y), (x_vel, y_vel)));
+    }
+
     for (mut current_velocity, current_boid) in boids_query.iter_mut() {
-        let mut nearby_positon: Vec<(f32, f32)> = Vec::new();
+        let mut nearby_position: Vec<(f32, f32)> = Vec::new();
         let mut nearby_velocity: Vec<(f32, f32)> = Vec::new();
 
         let mut acceleration = Vec2::new(0.0, 0.0);
         let current_x = current_boid.translation.x;
         let current_y = current_boid.translation.y;
 
-        for (other_velocity, other_boid) in boids_query.iter() {
-            let other_x = other_boid.translation.x.clone();
-            let other_y = other_boid.translation.y.clone();
-
+        for ((other_x, other_y), (other_vel_x, other_vel_y)) in other_boids.iter() {
             let distance = Vec2::new(current_x - other_x, current_y - other_y).length();
 
             if distance < VIEW_DISTANCE && distance != 0.0 {
-                nearby_positon.push((other_x, other_y));
-                nearby_velocity.push((other_velocity.x, other_velocity.y));
+                nearby_position.push((*other_x, *other_y));
+                nearby_velocity.push((*other_vel_x, *other_vel_y));
             }
         }
-        // acceleration += cohesion(&nearby_position, (&current_x, &current_y));
-        // acceleration += separation(&nearby_positon, (&current_x, &current_y));
-        acceleration += aligment(&nearby_velocity, &(current_velocity.x,current_velocity.y));
+        acceleration += cohesion(&nearby_position, (&current_x, &current_y));
+        acceleration += separation(&nearby_position, (&current_x, &current_y));
+        acceleration += aligment(&nearby_velocity, &(current_velocity.x, current_velocity.y));
 
         current_velocity.x += acceleration[0];
         current_velocity.y += acceleration[1];
@@ -141,15 +147,22 @@ fn boid_movement(
     let (height, width) = (window.height(), window.width());
 
     for (mut velocity, mut transform) in boids_query.iter_mut() {
+        let rotation_vec = Vec2::new(0.0, 0.0);
         let x = &mut transform.translation.x;
         if *x > width / 2.0 || *x < -width / 2.0 {
             velocity.x *= -1.0;
         }
-        *x += velocity.x.clamp(-2.0, 2.0);
+        let true_x_vel = velocity.x.clamp(-2.0, 2.0);
+        *x += true_x_vel;
+        rotation_vec.x += true_x_vel;
         let y = &mut transform.translation.y;
         if *y > height / 2.0 || *y < -height / 2.0 {
             velocity.y *= -1.0;
         }
-        *y += velocity.y.clamp(-2.0, 2.0);
+        let true_y_vel = velocity.y.clamp(-2.0, 2.0);
+        *y += true_y_vel;
+        rotation_vec.y += true_y_vel;
+
+        transform.rotate(rotation_vec.angle_between(Vec2::new(1.0, 0.0)));
     }
 }
