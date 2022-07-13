@@ -1,9 +1,9 @@
 use bevy::prelude::*;
+use bevy_prototype_lyon::prelude::*;
 use rand::Rng;
 
 use crate::components::Velocity;
 
-const BOID_SPRITE: &str = "boid.png";
 const VIEW_DISTANCE: f32 = 125.0;
 const BOID_POPULATION: i32 = 50;
 
@@ -26,34 +26,35 @@ impl Plugin for BoidPlugin {
 #[derive(Component)]
 pub struct Boid;
 
-fn spawn_boid(mut commands: Commands, assets_server: Res<AssetServer>, windows: Res<Windows>) {
+fn spawn_boid(mut commands: Commands, windows: Res<Windows>) {
     let mut rng = rand::thread_rng();
     let window = windows.get_primary().unwrap();
     let (width, height) = (window.width(), window.height());
 
+    let shape = shapes::RegularPolygon {
+        sides: 3,
+        feature: shapes::RegularPolygonFeature::Radius(5.0),
+        ..shapes::RegularPolygon::default()
+    };
+
     for _ in 0..BOID_POPULATION {
-        let pos_x = rng.gen_range(-width / 2.0..width / 2.0);
-        let pos_y = rng.gen_range(-height / 2.0..height / 2.0);
+        let x = rng.gen_range(-width / 2.0..width / 2.0);
+        let y = rng.gen_range(-height / 2.0..height / 2.0);
+
         commands
-            .spawn_bundle(SpriteBundle {
-                texture: assets_server.load(BOID_SPRITE),
-                transform: Transform {
-                    translation: Vec3::new(pos_x, pos_y, 0.0),
-                    scale: Vec3::new(0.03, 0.03, 1.),
+            .spawn_bundle(GeometryBuilder::build_as(
+                &shape,
+                DrawMode::Outlined {
+                    fill_mode: FillMode::color(Color::RED),
+                    outline_mode: StrokeMode::color(Color::RED),
+                },
+                Transform {
+                    translation: Vec3::new(x, y, 0.0),
                     ..Default::default()
                 },
-                ..Default::default()
-            })
+            ))
             .insert(Boid)
             .insert(Velocity { x: 0.0, y: 0.0 });
-    }
-}
-
-fn normalize(my_vec: Vec2) -> Vec2 {
-    if my_vec.x == 0.0 && my_vec.y == 0.0 {
-        my_vec
-    } else {
-        my_vec.normalize()
     }
 }
 
@@ -66,7 +67,7 @@ fn separation(nearby: &Vec<(f32, f32)>, this_pos: (&f32, &f32)) -> Vec2 {
         separation_vec += reverse_vec;
     }
 
-    normalize(separation_vec) * SEPARATION_FORCE
+    separation_vec.normalize_or_zero() * SEPARATION_FORCE
 }
 
 fn aligment(nearby_velocity: &Vec<(f32, f32)>, current_velocity: &(f32, f32)) -> Vec2 {
@@ -77,7 +78,7 @@ fn aligment(nearby_velocity: &Vec<(f32, f32)>, current_velocity: &(f32, f32)) ->
     }
     aligment_vec += Vec2::from(*current_velocity);
 
-    normalize(aligment_vec) * ALIGMENT_FORCE
+    aligment_vec.normalize_or_zero() * ALIGMENT_FORCE
 }
 
 fn cohesion(nearby: &Vec<(f32, f32)>, this_pos: (&f32, &f32)) -> Vec2 {
@@ -88,14 +89,14 @@ fn cohesion(nearby: &Vec<(f32, f32)>, this_pos: (&f32, &f32)) -> Vec2 {
     weight_center /= nearby.len() as f32;
 
     let cohesion_vec = Vec2::new(weight_center.x - this_pos.0, weight_center.y - this_pos.1);
-    normalize(cohesion_vec) * COHESION_FORCE
+    cohesion_vec.normalize_or_zero() * COHESION_FORCE
 }
 
 fn boid_initialize_velocity(mut boids_query: Query<&mut Velocity, With<Boid>>) {
     let mut rng = rand::thread_rng();
     for mut velocity in boids_query.iter_mut() {
         let mut start_vec = Vec2::from((rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)));
-        start_vec = start_vec.normalize();
+        start_vec = start_vec.normalize_or_zero();
 
         velocity.x = start_vec[0];
         velocity.y = start_vec[1];
@@ -147,22 +148,17 @@ fn boid_movement(
     let (height, width) = (window.height(), window.width());
 
     for (mut velocity, mut transform) in boids_query.iter_mut() {
-        let rotation_vec = Vec2::new(0.0, 0.0);
         let x = &mut transform.translation.x;
         if *x > width / 2.0 || *x < -width / 2.0 {
             velocity.x *= -1.0;
         }
         let true_x_vel = velocity.x.clamp(-2.0, 2.0);
         *x += true_x_vel;
-        rotation_vec.x += true_x_vel;
         let y = &mut transform.translation.y;
         if *y > height / 2.0 || *y < -height / 2.0 {
             velocity.y *= -1.0;
         }
         let true_y_vel = velocity.y.clamp(-2.0, 2.0);
         *y += true_y_vel;
-        rotation_vec.y += true_y_vel;
-
-        transform.rotate(rotation_vec.angle_between(Vec2::new(1.0, 0.0)));
     }
 }
